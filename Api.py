@@ -23,23 +23,24 @@ swagger = Swagger(app)
 df = pd.read_csv('data/resultado_links.csv')
 lista_pessoas = [Pessoa(**row) for row in df.to_dict(orient="records")]
 
-@app.route("/wikipedia_links/", methods=['GET'])
-@app.route("/wikipedia_links/<int:id>", methods=['GET'])
-def wikipedia_link(id):
+@app.route("/wikipedia_links/", defaults={"id": None}, methods=["GET"])
+@app.route("/wikipedia_links/<int:id>", methods=["GET"])
+def wikipedia_links(id):
     """
-    Retorna uma pessoa pelo id
+    Retorna informações sobre pessoas cadastradas no sistema.
+
     ---
     parameters:
       - name: id
         in: path
         type: integer
-        required: true
-        description: ID da pessoa
+        required: false
+        description: ID da pessoa (se não informado, retorna 200 pessoas)
     responses:
       200:
-        description: Retorna a pessoa encontrada
+        description: Retorna a(s) pessoa(s) encontrada(s)
         schema:
-          id: Pessoa
+          type: object
           properties:
             id:
               type: integer
@@ -54,60 +55,20 @@ def wikipedia_link(id):
       404:
         description: Pessoa não encontrada
     """
+    # Se nenhum ID for fornecido, retorna a lista completa
+    if id is None:
+        return jsonify([asdict(p) for p in lista_pessoas[0:200]]), 200
+
+    # Busca pessoa pelo ID
     pessoa_encontrada = next((p for p in lista_pessoas if p.id == id), None)
+
     if pessoa_encontrada:
-        return jsonify(asdict(pessoa_encontrada))
+        return jsonify(asdict(pessoa_encontrada)), 200
     else:
         return make_response(jsonify({"erro": "Pessoa não encontrada"}), 404)
 
 
-@app.route("/wikipedi_links", methods=['GET', 'POST'])
-def pessoas():
-    """
-    Retorna uma lista de pessoas de exemplo
-    ---
-    responses:
-      200:
-        description: Retorna um objeto Pessoa
-        examples:
-          application/json:
-            nome: "Ana"
-            link: "http://pessoas"
-            eh_pessoa: true
-            probabilidade: 0.95
-    """
-    if request.method == "GET":
-        return make_response(jsonify(lista_pessoas))
-    """elif request.method == "POST":
-        # Incluir uma nova tarefa
-        dados = request.get_json()
-        nova_tarefa = dados["tarefa"]
-        if nova_tarefa not in lista_pessoas:
-            lista_pessoas.append(nova_tarefa)
-            return make_response(jsonify("Tarefa foi incluída com sucesso"), 200)
-        else:
-            return make_response(jsonify("A tarefa já existe"), 400)"""
-"""
-@app.route("/tarefa/<int:id>", methods=["GET", "PUT", "DELETE"])
-def tarefa(id):
-    if id >= len(lista_tarefas):
-        return make_response(jsonify("Tarefa inexistente"), 400)
-    else:
-        if request.method == "GET":
-            # Retornar uma tarefa
-            return make_response(jsonify(lista_tarefas[id]))
-        elif request.method == "PUT":
-            # Editar uma tarefa
-            dados = request.get_json()
-            tarefa_editada = dados["tarefa"]
-            lista_tarefas[id] = tarefa_editada
-            return make_response(jsonify("Tarefa editada com sucesso"), 200)
-        elif request.method == "DELETE":
-            # Apagar uma tarefa
-            lista_tarefas.pop(id)
-            return make_response(jsonify("Tarefa excluída com sucesso"), 200)
-        else:
-            abort(404)
-"""
+
+
 if __name__ == "__main__":
     app.run(debug=True)
