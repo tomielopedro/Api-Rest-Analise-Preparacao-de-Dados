@@ -21,10 +21,19 @@ swagger = Swagger(app)
 
 
 df = pd.read_csv('data/resultado_links.csv')
-lista_pessoas = [Pessoa(**row) for row in df.to_dict(orient="records")]
+lista_links = [
+    Pessoa(
+        id=row["id"],
+        link=row["link"],
+        nome=row["nome"],
+        eh_pessoa=bool(row["eh_pessoa"]),
+        probabilidade=row["probabilidade"],
+    )
+    for row in df.to_dict(orient="records")
+]
 
 @app.route("/wikipedia_links/", defaults={"id": None}, methods=["GET"])
-@app.route("/wikipedia_links/<int:id>", methods=["GET"])
+@app.route("/wikipedia_links/<int:id>/", methods=["GET"])
 def wikipedia_links(id):
     """
     Retorna informações sobre pessoas cadastradas no sistema.
@@ -57,16 +66,50 @@ def wikipedia_links(id):
     """
     # Se nenhum ID for fornecido, retorna a lista completa
     if id is None:
-        return jsonify([asdict(p) for p in lista_pessoas[0:200]]), 200
+        return jsonify([asdict(p) for p in lista_links[0:200]]), 200
 
     # Busca pessoa pelo ID
-    pessoa_encontrada = next((p for p in lista_pessoas if p.id == id), None)
+    pessoa_encontrada = next((p for p in lista_links if p.id == id), None)
 
     if pessoa_encontrada:
         return jsonify(asdict(pessoa_encontrada)), 200
     else:
         return make_response(jsonify({"erro": "Pessoa não encontrada"}), 404)
 
+
+@app.route("/wikipedia_test", methods=["GET"])
+def wikipedia_test():
+    """
+    Testa parâmetro de query no Wikipedia
+    ---
+    parameters:
+      - name: only_pessoa
+        in: query
+        type: boolean
+        required: false
+        description: Indica se a lista retornada é apenas de pessoas
+    responses:
+      200:
+        description: Retorna a lista filtrada
+        schema:
+          type: array
+          items:
+            type: object
+    """
+    only_pessoa_str = request.args.get("only_pessoa")
+
+    # Converte string para boolean (true/1/t/yes → True)
+    only_pessoa = (
+        only_pessoa_str and only_pessoa_str.lower() in ["true", "1", "t", "yes", "y"]
+    )
+
+    if only_pessoa:
+        print(lista_links)
+        lista_pessoas = list(filter(lambda x: x.eh_pessoa, lista_links))
+        print(lista_pessoas)
+        return jsonify([asdict(p) for p in lista_links if p.eh_pessoa]), 200
+
+    return jsonify([asdict(p) for p in lista_links]), 200
 
 
 
