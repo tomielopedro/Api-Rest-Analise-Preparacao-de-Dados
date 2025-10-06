@@ -1,34 +1,21 @@
 from flask import Flask, request, abort, make_response, jsonify
 import pandas as pd
-from dataclasses import dataclass, asdict
+from dataclasses import asdict
 from flasgger import Swagger
 import json
 from dataclasses import dataclass
 
 
 @dataclass
-class Ator:
-    nome: str
-    papel: str
-    n_ep: int
-
-    def to_dict(self):
-        return {
-            "nome": self.nome,
-            "personagem": self.papel,
-            "quantidade_episodios": self.n_ep
-        }
-
-
-@dataclass
 class Serie:
+    id: int
     nome: str
     ordem: int
     ano_estreia: int
     ano_encerramento: int
     episodios: int
-    faixa_etaria: int  # Pode ser número ou "Livre" == 0
-    avaliacao: float
+    classificacao_indicativa: int  # Pode ser número ou "Livre" == 0
+    nota_imdb: float
     link: str
     popularidade: float
     atores: list
@@ -44,13 +31,14 @@ swagger = Swagger(app)
 df = pd.read_csv('data/series.csv')
 lista_links = [
     Serie(
+        id=row['id'],
         nome=row['titulo'],
         ordem=row['ordem'],
         ano_estreia=row['ano_estreia'],
         ano_encerramento=row['ano_encerramento'],
         episodios=row['episodios'],
-        faixa_etaria=row['classificacao_indicativa'],
-        avaliacao=row['nota_imdb'],
+        classificacao_indicativa=row['classificacao_indicativa'],
+        nota_imdb=row['nota_imdb'],
         link=row['link'],
         popularidade=row['popularidade'],
         atores=[]
@@ -60,14 +48,19 @@ lista_links = [
 ]
 
 
-@app.route("/series/")
-def series():
+@app.route("/series/<int:qtd>/", methods=["GET"])
+def series(qtd):
     """
-    Lista as séries disponíveis
+    Lista uma quantidade específica de séries
     ---
     tags:
       - Séries
-    description: Retorna uma lista das 200 primeiras séries cadastradas.
+    parameters:
+      - name: qtd
+        in: path
+        type: integer
+        required: true
+        description: Quantidade de séries a retornar
     responses:
       200:
         description: Lista de séries retornada com sucesso
@@ -83,11 +76,10 @@ def series():
                 type: string
                 example: "Pessoa 1"
     """
-    return jsonify([asdict(p) for p in lista_links[0:200]]), 200
+    return jsonify([asdict(p) for p in lista_links[0:qtd]]), 200
 
-
-@app.route("/series/<int:id>/", methods=["GET"])
-def series_by_id(id):
+@app.route("/series-id/<int:id>/", methods=["GET"])
+def get_series_by_id(id):
     """
     Retorna uma série específica pelo ID
     ---
@@ -120,7 +112,7 @@ def series_by_id(id):
               type: string
               example: "Pessoa não encontrada"
     """
-    pessoa_encontrada = next((p for p in lista_links if p.ordem == id), None)
+    pessoa_encontrada = next((p for p in lista_links if p.id == id), None)
 
     if pessoa_encontrada:
         return jsonify(asdict(pessoa_encontrada)), 200
@@ -129,40 +121,23 @@ def series_by_id(id):
 
 
 
-@app.route("/wikipedia_test", methods=["GET"])
-def wikipedia_test():
-    """
-    Testa parâmetro de query no Wikipedia
-    ---
-    parameters:
-      - name: only_pessoa
-        in: query
-        type: boolean
-        required: false
-        description: Indica se a lista retornada é apenas de pessoas
-    responses:
-      200:
-        description: Retorna a lista filtrada
-        schema:
-          type: array
-          items:
-            type: object
-    """
-    only_pessoa_str = request.args.get("only_pessoa")
+@app.route('/filtro', methods=['POST'])
+def receber_json():
 
-    # Converte string para boolean (true/1/t/yes → True)
-    only_pessoa = (
-        only_pessoa_str and only_pessoa_str.lower() in ["true", "1", "t", "yes", "y"]
-    )
+    data = request.get_json()
 
-    if only_pessoa:
-        print(lista_links)
-        lista_pessoas = list(filter(lambda x: x.eh_pessoa, lista_links))
-        print(lista_pessoas)
-        return jsonify([asdict(p) for p in lista_links if p.eh_pessoa]), 200
+    if not data:
+        return jsonify({"erro": "Nenhum JSON foi enviado"}), 400
 
-    return jsonify([asdict(p) for p in lista_links]), 200
+    nome = data.get('nome')
+    idade = data.get('idade')
 
+    # Faz algo com os dados
+    resposta = {
+        "mensagem": f"Olá, {nome}! Você tem {idade} anos."
+    }
+
+    return jsonify(resposta), 200
 
 
 if __name__ == "__main__":
