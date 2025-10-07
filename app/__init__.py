@@ -20,4 +20,7 @@ def create_app():
     # Disponibiliza o DataFrame no contexto do app
     app.df = df
 
+    # Salva o path do database
+    app.config["DATA_PATH"] = 'app/data/series.csv'
+
     return app
