@@ -4,7 +4,7 @@ import json
 @dataclass
 class Serie:
     id: int
-    nome: str
+    titulo: str
     ordem: int
     ano_estreia: int
     ano_encerramento: int
@@ -13,7 +13,6 @@ class Serie:
     nota_imdb: float
     link: str
     popularidade: float
-    atores: list
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), ensure_ascii=False)

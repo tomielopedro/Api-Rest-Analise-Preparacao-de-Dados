@@ -5,6 +5,19 @@ from app.models.serie import Serie
 
 series_bp = Blueprint('series', __name__)
 
+def criar_objeto_serie(row):
+    return Serie(
+        id=int(row.get("id", 0)),
+        titulo=str(row.get("titulo", "")),
+        ordem=int(row.get("ordem", 0)),
+        ano_estreia=int(row.get("ano_estreia", 0)),
+        ano_encerramento=int(row.get("ano_encerramento", 0)),
+        episodios=int(row.get("episodios", 0)),
+        classificacao_indicativa=int(row.get("classificacao_indicativa", 0)),
+        nota_imdb=float(row.get("nota_imdb", 0.0)),
+        link=str(row.get("link", "")),
+        popularidade=float(row.get("popularidade", 0.0))
+    )
 @series_bp.route("/series/<int:qtd>/", methods=["GET"])
 def series(qtd):
     """
@@ -29,7 +42,7 @@ def series(qtd):
               id:
                 type: integer
                 example: 1
-              nome:
+              titulo:
                 type: string
                 example: "Breaking Bad"
               ordem:
@@ -64,25 +77,9 @@ def series(qtd):
                   type: string
                 example: ["Bryan Cranston", "Aaron Paul"]
     """
-    df = current_app.df
-    lista_links = [
-        Serie(
-            id=row['id'],
-            nome=row['titulo'],
-            ordem=row['ordem'],
-            ano_estreia=row['ano_estreia'],
-            ano_encerramento=row['ano_encerramento'],
-            episodios=row['episodios'],
-            classificacao_indicativa=row['classificacao_indicativa'],
-            nota_imdb=row['nota_imdb'],
-            link=row['link'],
-            popularidade=row['popularidade'],
-            atores=row.get('atores', [])
-        )
-        for row in df.to_dict(orient="records")
-    ]
-    return jsonify([asdict(p) for p in lista_links[:qtd]]), 200
-
+    df = current_app.df.fillna(0)
+    lista_series = [criar_objeto_serie(row) for row in df.to_dict(orient="records")]
+    return jsonify([asdict(s) for s in lista_series[:qtd]]), 200
 
 @series_bp.route("/series-id/<int:id>/", methods=["GET"])
 def get_series_by_id(id):
@@ -106,7 +103,7 @@ def get_series_by_id(id):
             id:
               type: integer
               example: 1
-            nome:
+            titulo:
               type: string
               example: "Breaking Bad"
             ordem:
@@ -135,11 +132,6 @@ def get_series_by_id(id):
               type: number
               format: float
               example: 98.5
-            atores:
-              type: array
-              items:
-                type: string
-              example: ["Bryan Cranston", "Aaron Paul"]
       404:
         description: Série não encontrada
         schema:
@@ -153,8 +145,8 @@ def get_series_by_id(id):
     row = df.loc[df["id"] == id]
 
     if not row.empty:
-        serie = row.to_dict(orient="records")[0]
-        return jsonify(serie), 200
+        serie = criar_objeto_serie(row.to_dict(orient="records")[0])
+        return jsonify(asdict(serie)), 200
     else:
         return make_response(jsonify({"erro": "Série não encontrada"}), 404)
 
@@ -180,7 +172,7 @@ def create_serie():
         schema:
           type: object
           required:
-            - nome
+            - titulo
             - ordem
             - ano_estreia
             - episodios
@@ -189,7 +181,7 @@ def create_serie():
             - link
             - popularidade
           properties:
-            nome:
+            titulo:
               type: string
               description: Nome da série.
               example: "Breaking Bad"
@@ -227,12 +219,6 @@ def create_serie():
               format: float
               description: Índice de popularidade da série.
               example: 98.5
-            atores:
-              type: array
-              items:
-                type: string
-              description: Lista de atores principais (opcional).
-              example: "Bryan Cranston, Aaron Paul"
     responses:
       201:
         description: Série criada com sucesso.
@@ -258,7 +244,7 @@ def create_serie():
     data = request.get_json()
 
     campos_obrigatorios = [
-        "nome", "ordem", "ano_estreia", "episodios", "classificacao_indicativa",
+        "titulo", "ordem", "ano_estreia", "episodios", "classificacao_indicativa",
         "nota_imdb", "link", "popularidade",
     ]
 
@@ -268,12 +254,16 @@ def create_serie():
     new_id = int(df["id"].max() + 1 if not df.empty else 1)
     nova_serie = Serie(id=new_id, **data)
     nova_linha = pd.DataFrame([asdict(nova_serie)])
-    nova_linha = nova_linha.rename(columns={"nome": "titulo"})
 
     current_app.df = pd.concat([df, nova_linha], ignore_index=True)
     current_app.df.to_csv(current_app.config["DATA_PATH"], index=False)
 
-    return jsonify({"mensagem": "Série criada com sucesso", "id": new_id}), 201
+    return jsonify({
+        "mensagem": "Série criada com sucesso",
+        "id": new_id,
+        "serie": asdict(nova_serie)
+    }), 201
+
 
 
 @series_bp.route("/series-id/<int:id>/", methods=["PUT"])
@@ -298,7 +288,7 @@ def update_serie(id):
         schema:
           type: object
           required:
-            - nome
+            - titulo
             - ordem
             - ano_estreia
             - episodios
@@ -307,7 +297,7 @@ def update_serie(id):
             - link
             - popularidade
           properties:
-            nome:
+            titulo:
               type: string
               description: Nome da série.
               example: "Breaking Bad"
@@ -370,20 +360,28 @@ def update_serie(id):
               example: "Série não encontrada"
     """
     df = current_app.df
-    df = df.rename(columns={"titulo": "nome"})
     data = request.get_json()
 
     if id not in df["id"].values:
         return make_response(jsonify({"erro": "Série não encontrada"}), 404)
 
+    # Atualiza apenas campos existentes no modelo
+    campos_validos = asdict(Serie(
+        id=0, titulo="", ordem=0, ano_estreia=0, ano_encerramento=0,
+        episodios=0, classificacao_indicativa=0, nota_imdb=0.0,
+        link="", popularidade=0.0
+    )).keys()
+
     for key, value in data.items():
-        if key in df.columns:
+        if key in campos_validos:
             df.loc[df["id"] == id, key] = value
 
-    current_app.df = df.rename(columns={"nome": "titulo"})
+    current_app.df = df
     current_app.df.to_csv(current_app.config["DATA_PATH"], index=False)
 
-    return jsonify({"mensagem": "Série atualizada com sucesso"}), 200
+    serie_atualizada = criar_objeto_serie(df.loc[df["id"] == id].to_dict(orient="records")[0])
+    return jsonify({"mensagem": "Série atualizada com sucesso", "serie": asdict(serie_atualizada)}), 200
+
 
 
 @series_bp.route("/series-id/<int:id>/", methods=["DELETE"])
@@ -424,7 +422,6 @@ def delete_serie(id):
 
     df = df[df["id"] != id]
     current_app.df = df.reset_index(drop=True)
-
     current_app.df.to_csv(current_app.config["DATA_PATH"], index=False)
 
     return jsonify({"mensagem": f"Série com id {id} deletada com sucesso"}), 200

@@ -22,7 +22,7 @@ def filtro_series():
             id:
               type: integer
               example: 1
-            nome:
+            titulo:
               type: string
               example: "Breaking Bad"
             ordem:
@@ -62,7 +62,7 @@ def filtro_series():
               id:
                 type: integer
                 example: 1
-              nome:
+              titulo:
                 type: string
                 example: "Breaking Bad"
               ordem:
