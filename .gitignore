@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.env
+*.venv/
+env/
+venv/
+*.swp
+*.swo
+
+# Flask / Config
+instance/
+*.db
+*.sqlite
+*.sqlite3
+
+# CSV / dados
+*.csv
+
+# IDEs
+.vscode/
+.idea/
+*.iml
+
+# Logs
+*.log
+
+# MacOS
+.DS_Store
+
+# Docker
+*.pid
+*.sock
+docker-compose.override.yml
